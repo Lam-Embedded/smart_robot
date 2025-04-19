@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ESP32 WebApp</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Step 1: WiFi Login -->
+  <div id="wifi-login" class="step">
+    <h2>Kết nối WiFi</h2>
+    <form id="wifi-form">
+      <label>SSID:</label>
+      <input type="text" name="ssid" required>
+      <label>Password:</label>
+      <input type="password" name="password" required>
+      <button type="submit">Kết nối</button>
+    </form>
+  </div>
+
+  <!-- Step 2: User Login -->
+  <div id="user-login" class="step" style="display:none;">
+    <h2>Đăng nhập người dùng</h2>
+    <form id="user-form">
+      <label>Tên:</label>
+      <input type="text" name="name" required>
+      <label>Tuổi:</label>
+      <input type="number" name="age" required>
+      <button type="submit">Tiếp tục</button>
+    </form>
+  </div>
+
+  <!-- Step 3: Time Table -->
+  <div id="schedule-page" class="step" style="display:none;">
+    <h2>Thời gian biểu hôm nay (<span id="date-display"></span>)</h2>
+    <table id="schedule-table">
+      <thead>
+        <tr>
+          <th>Thời gian</th>
+          <th>Hoạt động</th>
+        </tr>
+      </thead>
+      <tbody id="schedule-body">
+        <!-- Dữ liệu từ ESP32 -->
+      </tbody>
+    </table>
+    <div class="controls">
+      <button id="prev-day">← Ngày trước</button>
+      <button id="next-day">Ngày sau →</button>
+      <button id="edit-btn">Chỉnh sửa</button>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
