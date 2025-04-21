@@ -47,7 +47,7 @@ void scanWifi() {
     // Ham WiFi.scanNetworks(); tra ve so wifi hien co
     int wifiScan = WiFi.scanNetworks();
 
-    if (wifiScan == 0){
+    if (wifiScan == 0) {
         Serial.println("No wifi!!!");
     }
     else {
