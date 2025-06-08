@@ -1,4 +1,5 @@
 #include "screenTestLabel.h"
+#include "Fonts/fonts.h"
 
 lv_obj_t* screenTestLabel() {
     /* Create a screen */
@@ -7,10 +8,10 @@ lv_obj_t* screenTestLabel() {
 
     /* Create label for button */
     lv_obj_t* labelNomal = lv_label_create(screenNomal);
-    lv_label_set_text(labelNomal, "Nga ngo, i love you chucamo");
+    lv_label_set_text(labelNomal, "Nga ngố hôm nay em ăn gì");
     lv_obj_align(labelNomal, LV_ALIGN_CENTER, 0, 0);
     lv_obj_set_width(labelNomal, 300);
-    lv_obj_set_style_text_font(labelNomal, &lv_font_montserrat_46, LV_PART_MAIN);
+    lv_obj_set_style_text_font(labelNomal, &Nunito_Bold_24, LV_PART_MAIN);
     lv_label_set_long_mode(labelNomal, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
 
     return screenNomal;

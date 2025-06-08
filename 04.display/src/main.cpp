@@ -7,6 +7,9 @@
 #endif
 #include "screen/screenTest.h"
 #include "screen/screenTestLabel.h"
+#include "screen/screenMove.h"
+#include "screen/displayFace.h"
+
 
 /* -------------------------------------------------------------------------- */
 /*                          Display & Touch Settings                          */
@@ -77,6 +80,7 @@ void setup() {
   /* button */
   activity_1();
 
+
 }
 
 /* -------------------------------------------------------------------------- */
@@ -117,6 +121,6 @@ static uint32_t my_tick() {
 
 void activity_1() {
   /* screen */
-  static lv_obj_t *screen = screenTestLabel();
+  static lv_obj_t *screen = displayFace();
   lv_screen_load(screen);
 }
