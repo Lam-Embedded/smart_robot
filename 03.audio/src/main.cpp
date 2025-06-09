@@ -1,45 +1,29 @@
 #include <Arduino.h>
 #include <WiFi.h>
-#include <HTTPClient.h>
-#include <ArduinoJson.h>
 #include <Audio.h>
-
-// ====== WiFi & API Config ======
-const char* WIFI_SSID = "Redmi";
-const char* WIFI_PASSWORD = "11111111";
-const char* GEMINI_API_KEY = "AIzaSyCUN0rPc_TaPx2TUTmSZMY23r0Kypc_Y6Q";
-const int GEMINI_MAX_TOKENS = 100;
-const char* GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=";
-
-// ====== I2S Audio Pins ======
-#define I2S_DOUT 25
-#define I2S_BCLK 27
-#define I2S_LRC  26
+#include <HTTPClient.h>
+#include "AskGemini.h"
+#include "setUpWifi.h"
+#include "textToSpeech.h"
+#include "AudioFileSourceHTTPStream.h"
+#include "AudioGeneratorMP3.h"
+#include "AudioOutputI2S.h"
 
 Audio audio;
 
+AudioGeneratorMP3 *mp3;
+AudioFileSourceHTTPStream *file;
+AudioOutputI2S *out;
+
 // ====== Function Prototypes ======
-String askGemini(const String& question);
-String readSerialInput();
 void audio_info(const char *info);
-String cleanTextForTTS(const String& input);
+String readSerialInput();
+int splitText(String input, int wordsPerSegment, String segments[], String store_url[], int maxSegments);
 
 // ====== Setup ======
 void setup() {
     Serial.begin(115200);
-
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-    Serial.print("Connecting to WiFi");
-
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial.print(".");
-    }
-
-    Serial.println("\nConnected!");
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
+    wifiSetup();
 
     // Audio Setup
     audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
@@ -48,10 +32,15 @@ void setup() {
 
 // ====== Main Loop ======
 void loop() {
-    audio.loop();  // Required to keep audio running
+    static const int MAX_SEGMENTS = 10;
+    String segments[MAX_SEGMENTS];
+    String store_url[MAX_SEGMENTS];
+
+    audio.loop();  // Keep audio running
 
     Serial.println("\nAsk your question:");
     String question = readSerialInput();
+    question += " (câu trả lời ngắn ngọn xúc tích nhất có thể, số từ nhỏ hơn 200, viết liền mạch)";
 
     if (question.length() == 0) {
         Serial.println("Empty question. Please type again.");
@@ -59,20 +48,28 @@ void loop() {
     }
 
     Serial.println("\nSending to Gemini...");
-    String response = askGemini(question);
+    String response = askGemini(question) + " Hết";
 
     Serial.println("\nGemini Response:\n" + response);
 
-    // Speak the response
-    String cleaned = cleanTextForTTS(response);
-    audio.connecttospeech(cleaned.c_str(), "vi");
+    int numSegments = splitText(response, 20, segments, store_url, MAX_SEGMENTS);
 
+    for (int i = 0; i < numSegments; i++) {
+        Serial.println("Speaking segment: " + segments[i]);
+        audio.connecttohost(store_url[i].c_str());
 
-    // Wait for audio to finish speaking before accepting next input
-    while (audio.isRunning()) {
-        audio.loop();
-        delay(10);
+        while (audio.isRunning()) {
+            audio.loop();
+            delay(10);
+        }
     }
+}
+
+
+// ====== Audio Info Callback (Optional for Debugging) ======
+void audio_info(const char *info) {
+    Serial.print("Audio info: ");
+    Serial.println(info);
 }
 
 // ====== Read Serial Input ======
@@ -95,61 +92,48 @@ String readSerialInput() {
     return input;
 }
 
-// ====== Ask Gemini ======
-String askGemini(const String& question) {
-    HTTPClient http;
-    String url = String(GEMINI_URL) + GEMINI_API_KEY;
+int splitText(String input, int wordsPerSegment, String segments[], String store_url[], int maxSegments) {
+    input.replace("\n", "");
+    input.replace("\r", "");
 
-    if (!http.begin(url)) {
-        return "Không thể kết nối tới máy chủ Gemini.";
-    }
+    int wordCount = 0;
+    String segment = "";
+    int index = 0;
+    int segmentIndex = 0;
 
-    // question = question + "(As brief as possible)";
+    while (index < input.length()) {
+        int spaceIndex = input.indexOf(' ', index);
+        if (spaceIndex == -1) spaceIndex = input.length();
 
-    http.addHeader("Content-Type", "application/json");
-    String payload = "{\"contents\":[{\"parts\":[{\"text\":\"" + question + "\"}]}],\"generationConfig\":{\"maxOutputTokens\":" + String(GEMINI_MAX_TOKENS) + "}}";
+        String word = input.substring(index, spaceIndex);
+        segment += word + " ";
+        wordCount++;
 
-    int httpCode = http.POST(payload);
-    if (httpCode != HTTP_CODE_OK) {
-        http.end();
-        return "Lỗi HTTP: " + http.errorToString(httpCode);
-    }
-
-    String response = http.getString();
-    http.end();
-
-    DynamicJsonDocument doc(2048);
-    DeserializationError error = deserializeJson(doc, response);
-
-    if (error) {
-        return "Lỗi phân tích JSON.";
-    }
-
-    String answer = doc["candidates"][0]["content"]["parts"][0]["text"].as<String>();
-    answer.trim();
-
-    return answer;
-}
-
-// ====== Audio Info Callback (Optional for Debugging) ======
-void audio_info(const char *info) {
-    Serial.print("Audio info: ");
-    Serial.println(info);
-}
-
-String cleanTextForTTS(const String& input) {
-    String output = "";
-    for (size_t i = 0; i < input.length(); i++) {
-        char c = input[i];
-        if (isPrintable(c) && c != '*' && c != '`') {
-            output += c;
-        } else {
-            output += ' ';
+        if (wordCount == wordsPerSegment) {
+            if (segmentIndex < maxSegments) {
+                segments[segmentIndex] = segment;
+                store_url[segmentIndex] = getFPTAudioURL(segment);
+                if (store_url[segmentIndex] == "") {
+                    Serial.println("Không lấy được link âm thanh!");
+                }
+                segmentIndex++;
+            }
+            segment = "";
+            wordCount = 0;
         }
+
+        index = spaceIndex + 1;
     }
-    output.trim();
-    if (output.length() > 200) {
-        output = output.substring(0, 200); // Google TTS giới hạn ~200 ký tự
+
+    // Lưu đoạn cuối nếu còn
+    if (segment.length() > 0 && segmentIndex < maxSegments) {
+        segments[segmentIndex] = segment;
+        store_url[segmentIndex] = getFPTAudioURL(segment);
+        if (store_url[segmentIndex] == "") {
+            Serial.println("Không lấy được link âm thanh!");
+        }
+        segmentIndex++;
     }
-    return output;
+
+    return segmentIndex;
 }
