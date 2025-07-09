@@ -39,9 +39,11 @@ String askGemini(const String& question) {
 
     int httpCode = http.POST(payload);
     if (httpCode != HTTP_CODE_OK) {
-        String errorMsg = "Lỗi HTTP: " + http.errorToString(httpCode);
+        Serial.print("❌ HTTP lỗi mã: ");
+        Serial.println(httpCode);
+        Serial.println(http.errorToString(httpCode));
         http.end();
-        return errorMsg;
+        return "Lỗi HTTP: " + http.errorToString(httpCode);
     }
 
     String response = http.getString();
