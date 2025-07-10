@@ -6,12 +6,12 @@
 #include <HTTPClient.h>
 #include <SD.h>
 
-#include "AskGemini.h"
-#include "setUpWifi.h"
-#include "textToSpeech.h"
+#include "userLib/AskGemini.h"
+#include "userLib/setUpWifi.h"
+#include "userLib/textToSpeech.h"
 #include "AudioFileSourceHTTPStream.h"
-#include "lib_audio_recording.h"
-#include "lib_audio_transcription.h"
+#include "userLib/lib_audio_recording.h"
+#include "userLib/lib_audio_transcription.h"
 
 /*========================= DEFINE SOUCE FILE ===========================*/
 #define AUDIO_FILE        "/test_1.wav"
@@ -45,7 +45,7 @@ bool shouldPingServer(uint32_t last_ping);
 void initPins();
 void initSDCard();
 void handleRecordingStart();
-String handleRecordingStopAndTranscribe();
+void handleRecordingStopAndTranscribe();
 void indicateReconnect();
 void callback(char* topic, byte* message, unsigned int length);
 void reconnect();
@@ -59,7 +59,7 @@ void setup() {
     Serial.setTimeout(100);
 
     audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
-    audio.setVolume(21);
+    audio.setVolume(255);
 
     client.setServer(mqtt_server, mqtt_port);
     client.setCallback(callback);
@@ -78,36 +78,36 @@ void loop() {
     client.loop();
     audio.loop();
 
-    if (!hasSpoken) {
-        hasSpoken = true;
+    // if (!hasSpoken) {
+    //     hasSpoken = true;
 
-        const int MAX_SEGMENTS = 10;
-        String segments[MAX_SEGMENTS];
-        String store_url[MAX_SEGMENTS];
+    //     const int MAX_SEGMENTS = 10;
+    //     String segments[MAX_SEGMENTS];
+    //     String store_url[MAX_SEGMENTS];
 
-        String test = "xin chào, tôi là Lâm";
-        speech_answer(test, segments, store_url, MAX_SEGMENTS);
+    //     String test = "xin chào, tôi là Lâm";
+    //     speech_answer(test, segments, store_url, MAX_SEGMENTS);
+    // }
+
+    const int MAX_SEGMENTS = 10;
+    static uint32_t last_keepalive_time = 0;
+    String segments[MAX_SEGMENTS];
+    String store_url[MAX_SEGMENTS];
+
+    if (isButtonPressed()) {
+        handleRecordingStart();
     }
 
-    // const int MAX_SEGMENTS = 10;
-    // static uint32_t last_keepalive_time = 0;
-    // String segments[MAX_SEGMENTS];
-    // String store_url[MAX_SEGMENTS];
+    if (isButtonReleased()) {
+        handleRecordingStopAndTranscribe();
+        // speech_answer(text, segments, store_url, MAX_SEGMENTS);
+    }
 
-    // if (isButtonPressed()) {
-    //     handleRecordingStart();
-    // }
-
-    // if (isButtonReleased()) {
-    //     String text = handleRecordingStopAndTranscribe();
-    //     speech_answer(text, segments, store_url, MAX_SEGMENTS);
-    // }
-
-    // if (shouldPingServer(last_keepalive_time)) {
-    //     last_keepalive_time = millis();
-    //     indicateReconnect();
-    //     Deepgram_KeepAlive();
-    // }
+    if (shouldPingServer(last_keepalive_time)) {
+        last_keepalive_time = millis();
+        indicateReconnect();
+        Deepgram_KeepAlive();
+    }
 }
 
 void audio_info(const char* info) {
@@ -205,7 +205,7 @@ void handleRecordingStart() {
     Record_Start(AUDIO_FILE);
 }
 
-String handleRecordingStopAndTranscribe() {
+void handleRecordingStopAndTranscribe() {
     digitalWrite(LED, LOW);
 
     float recorded_seconds;
@@ -217,8 +217,8 @@ String handleRecordingStopAndTranscribe() {
 
             if (transcription.length() == 0) {
                 Serial.println("Empty question. Please type again.");
-                transcription = "hello";
-                return transcription;
+                String rerult = "hello";
+                return;
             }
             
             transcription += " (câu trả lời theo văn phong cách nói chuyên tự nhiên, dễ thương, ngắn ngọn xúc tích nhất có thể, số từ nhỏ hơn 200, viết liền mạch)";
@@ -227,7 +227,6 @@ String handleRecordingStopAndTranscribe() {
             String response = askGemini(transcription) + " Hết";
             Serial.println("\nGemini Response:\n" + response);
 
-            return response;  
         }
     }
 }
